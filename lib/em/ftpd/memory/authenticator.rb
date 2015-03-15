@@ -3,10 +3,12 @@ require 'digest/md5'
 
 module EM::FTPD::Memory
   class User < Struct.new(:name, :credential); end
-  class InvalidPasswordAlgorithm < StandardError; end
+  class InvalidPasswordAlgorithmError < StandardError; end
   class NoSuchUserError < StandardError; end
-  class InvalidCredentialdError < StandardError; end
+  class InvalidCredentialError < StandardError; end
   class ExpiredCredentialError < StandardError; end
+  class MalformatedCredentialError < StandardError; end
+  class NoFurtherCredentialsAvailable < StandardError; end
 
   class Authenticator
     @@realms = Hash.new
@@ -21,6 +23,10 @@ module EM::FTPD::Memory
     def initialize(options = {})
       @users = Hash.new
       @pwalgo = options["pwalgo"] || "plain"
+      @pwalgo = "#{@pwalgo}_authentication".to_sym
+      unless self.respond_to?(@pwalgo)
+        raise InvalidPasswordAlgorithmError.new
+      end
     end
   
     def <<(user)
@@ -35,18 +41,12 @@ module EM::FTPD::Memory
       if @users[username].nil?
         raise NoSuchUserError.new
       end
-      # this prevents someone from setting "delete" as the authentication algorithm
-      algo = "#{@pwalgo}_authentication".to_sym
-      if self.respond_to?(algo)
-        self.send(algo, username, credential)
-      else
-        raise InvalidPasswordAlgorithmError.new
-      end
+      self.send(@pwalgo, username, credential)
     end
   
     def plain_authentication(username, credential)
       if @users[username].credential != credential
-        raise InvalidCredentialdError.new
+        raise InvalidCredentialError.new
       else
         return true
       end
@@ -54,6 +54,9 @@ module EM::FTPD::Memory
   
     def timed_md5_authentication(username, credential)
       seed, time, hash = credential.split(/:/, 3)
+      if hash.nil? or hash.length != 32
+        raise MalformatedCredentialError.new
+      end
       if (time.to_i - Time.now.to_i).abs > 300
         raise ExpiredCredentialError.new
       else
