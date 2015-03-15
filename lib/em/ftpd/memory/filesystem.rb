@@ -36,8 +36,8 @@ module EM::FTPD::Memory
       is_dir(path) || is_file(path)
     end
     
-    def chdir(path, user = nil)
-      is_dir(path) && use_allowed(path, :list, user)
+    def change_dir(path, user = nil)
+      is_dir(path) && use_allowed?(path, :list, user)
     end
     
     def list_files(path, user = nil)

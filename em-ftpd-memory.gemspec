@@ -4,7 +4,7 @@ $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 
 Gem::Specification.new do |spec|
   spec.name          = "em-ftpd-memory"
-  spec.version       = "0.0.2"
+  spec.version       = "0.0.3"
   spec.authors       = ["chrislee35"]
   spec.email         = ["rubygems@chrislee.dhs.org"]
   spec.summary       = %q{Memory-based backing store for em-ftpd}
