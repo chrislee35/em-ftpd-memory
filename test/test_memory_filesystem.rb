@@ -171,12 +171,17 @@ class TestMemoryFilesystem < Minitest::Test
     assert_equal(169, fs.file_size("/pub/pub2/pub3/pub4/helper.rb", "root"))
 
 
-    assert_equal(0, fs.list_files("/pub/pub2/pub3", "charlie").length)
-    refute(fs.file_size("/pub/pub2/pub3/pub4/helper.rb", "charlie"))
-    assert(fs.set_owner("/pub/pub2/pub3", "charlie", "root"))
-    assert_equal(1, fs.list_files("/pub/pub2/pub3", "charlie").length)
-    assert_equal(169, fs.file_size("/pub/pub2/pub3/pub4/helper.rb", "charlie"))
-    
+    assert_equal(0, fs.list_files("/pub/pub2/pub3", "jem").length)
+    refute(fs.file_size("/pub/pub2/pub3/pub4/helper.rb", "jem"))
+    assert(fs.set_owner("/pub/pub2/pub3", "jem", "root"))
+    assert_equal(1, fs.list_files("/pub/pub2/pub3", "jem").length)
+    assert_equal(169, fs.file_size("/pub/pub2/pub3/pub4/helper.rb", "jem"))
+
+    assert(fs.set_permissions("/pub/pub2", "rwx......", "root"))
+    # jem owns pub3, but should be denied since she can't traverse pub2
+    refute(fs.set_permissions("/pub/pub2/pub3", "rwx......", "jem"))
+    assert(fs.set_permissions("/pub/pub2", "rwxr.xr.x", "root"))
+    assert(fs.set_permissions("/pub/pub2/pub3", "rwx......", "jem"))
   end
 
 end

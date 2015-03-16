@@ -52,6 +52,13 @@ module EM::FTPD::Memory
       f.size
     end
     
+    def modified_time(path, user = nil)
+      return nil unless use_allowed?(path, :time, user)
+      f = get_file(path)
+      return nil unless f
+      f.time
+    end
+    
     def file_contents(path, user = nil)
       return false unless use_allowed?(path, :read, user)
       # nil || false => false
@@ -162,11 +169,12 @@ module EM::FTPD::Memory
       raise InvalidPermissionsError.new if permissions.nil?
       raise InvalidPermissionsError.new(permissions.to_s) unless permissions.class == String
       raise InvalidPermissionsError.new(permissions) unless permissions =~ /^[r\.][w\.][x\.][r\.][w\.][x\.][r\.][w\.][x\.]$/
-      entry = get_entry(path)
-      return false unless entry
-      return false unless user and (entry.owner == user or user == "root")
-      entry.permissions = permissions
-      true
+      if use_allowed?(path, :chmod, user)
+        entry = get_entry(path)
+        entry.permissions = permissions
+        return true
+      end
+      false
     end
     
     def set_owner(path, owner, user = nil)
@@ -230,6 +238,11 @@ module EM::FTPD::Memory
         return allowed?(path, 'rx', username)
       when :size
         return true # since we've already checked everything
+      when :time
+        return true # since we've already checked everything
+      when :chmod
+        entry = get_entry(path)
+        return entry.owner == username
       when :delete
         return allowed?(dirname, "rwx", username)
       when :create

@@ -62,5 +62,9 @@ module EM::FTPD::Memory
       yield @fs.create_dir(path, @authenticated_user)
     end
     
+    def mtime(path, &block)
+      yield @fs.modified_time(path, @authenticated_user)
+    end
+    
   end
 end

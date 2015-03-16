@@ -28,7 +28,7 @@ class TestFTPDMemory < Minitest::Test
     
     EM.run {
       EventMachine::start_server("0.0.0.0", 2021, EM::FTPD::Server, EM::FTPD::Memory::Driver, options)
-      EM::Timer.new(100) do
+      EM::Timer.new(0.1) do
         EM.stop
       end
     }
