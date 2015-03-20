@@ -1,6 +1,22 @@
 module EM::FTPD::Memory
   class InvalidPermissionsError < StandardError; end
   
+  class MemoryDirectoryItem
+    ATTRS = [:name, :owner, :group, :size, :time, :permissions, :directory, :contents]
+    attr_accessor(*ATTRS)
+
+    def initialize(options)
+      options.each do |attr, value|
+        self.send("#{attr}=", value)
+      end
+      @size ||= 0
+      @time ||= Time.now
+      @owner ||= "nobody"
+      @group ||= "nogroup"
+      raise ArgumentError.new("MemoryDirectoryItem requires a :name") unless @name
+    end
+  end
+  
   class FileSystem
     @@filesystems = Hash.new
     def self.getFileSystem(name)
@@ -23,61 +39,84 @@ module EM::FTPD::Memory
         end
       end
     end
+
+
+# TODO: support groups
     
-    def initialize()
-      @root_entry = EM::FTPD::DirectoryItem.new(:name => 'root', :directory => true, :size => 0, :permissions => 'rwxrwxrwx', :owner => 'root', :group => 'root')
-      @root = {
-        '/' => Array.new
-      }
-      @contents = Hash.new
+    def initialize
+      @root = MemoryDirectoryItem.new(:name => '/', :owner => 'root', :directory => true, :permissions => "rwxr.xr.x", :contents => Hash.new)
     end
 
     def exist?(path)
-      is_dir(path) || is_file(path)
+      item = get_item(path)
+      if item
+        return true
+      else
+        return false
+      end
+    end
+    
+    def is_dir?(path)
+      item = get_item(path)
+      return false unless item and item.directory
+      true
+    end
+    
+    def is_file?(path)
+      item = get_item(path)
+      return false unless item and not item.directory
+      true
     end
     
     def change_dir(path, user = nil)
-      is_dir(path) && use_allowed?(path, :list, user)
+      item = get_item(path)
+      item.directory && use_allowed?(path, :list, user)
     end
     
     def list_files(path, user = nil)
       return [] unless use_allowed?(path, :list, user)
-      @root[path] || [] # should this return false?
+      item = get_item(path)
+      if item.directory
+        return item.contents.values
+      end
+      return []
     end
     
     def file_size(path, user = nil)
       return false unless use_allowed?(path, :size, user)
-      f = get_file(path)
+      f = get_item(path)
       return false unless f
       f.size
     end
     
     def modified_time(path, user = nil)
       return nil unless use_allowed?(path, :time, user)
-      f = get_file(path)
+      f = get_item(path)
       return nil unless f
       f.time
     end
     
     def file_contents(path, user = nil)
       return false unless use_allowed?(path, :read, user)
-      # nil || false => false
-      @contents[path] || false
+      item = get_item(path)
+      item.contents || false
     end
     
     def create_file(path, data, user = "nobody")
       return false unless use_allowed?(path, :create, user)
       dirname = File.dirname(path)
       basename = File.basename(path)
-      if is_dir(dirname)
+      dir = get_item(dirname)
+      if dir and dir.directory
+        item = get_item(path)
         contents = File.open(data,'r').read
-        f = get_file(path)
-        if f
-          f.size = contents.length
-        else
-          @root[dirname] << EM::FTPD::DirectoryItem.new(:name => basename, :directory => false, :size => contents.length)
+        permissions = "rwxrwxrwx" # FIXME
+        if item # overwrite
+          item.contents = contents
+          item.size = contents.length
+        else # create new
+          dir.contents[basename] = MemoryDirectoryItem.new(:name => basename, :owner => user, :size => contents.length, :contents => contents, :permissions => permissions)
         end
-        @contents[path] = contents
         return true
       else
         return false
@@ -85,37 +124,39 @@ module EM::FTPD::Memory
     end
     
     def delete_file(path, user = nil)
-      if is_file(path)
-        return false unless use_allowed?(path, :delete, user)
-        dirname = File.dirname(path)
-        basename = File.basename(path)
-        @root[dirname].reject! {|file| file.directory == false && file.name == basename}
-        @contents.delete(path)
+      return false unless use_allowed?(path, :delete, user)
+      dirname = File.dirname(path)
+      basename = File.basename(path)
+      dir = get_item(dirname)
+      if dir and dir.directory and dir.contents[basename]
+        dir.contents.delete(basename)
         return true
       end
       false
     end
     
     def delete_dir(path, user = nil)
-      if is_dir(path) && @root[path].empty?
+      dir = get_item(path)
+      if dir and dir.directory and dir.contents.empty?
         return false unless use_allowed?(path, :delete, user)
-        @root.delete(path)
         dirname = File.dirname(path)
         basename = File.basename(path)
-        @root[dirname].reject! {|file| file.directory == true && file.name == basename}
+        parent = get_item(dirname)
+        parent.contents.delete(basename)
         return true
       end
       false
     end
     
     def create_dir(path, user = "nobody")
-      if not exist?(path)
+      dir = get_item(path)
+      if dir.nil?
         return false unless use_allowed?(path, :create, user)
         dirname = File.dirname(path)
         basename = File.basename(path)
-        if is_dir(dirname)
-          @root[path] = Array.new
-          @root[dirname] << EM::FTPD::DirectoryItem.new(:name => basename, :directory => true, :size => 0)
+        parent = get_item(dirname)
+        if parent and parent.directory
+          parent.contents[basename] = MemoryDirectoryItem.new(:name => basename, :directory => true, :owner => user, :contents => Hash.new)
           return true
         end
       end
@@ -123,8 +164,10 @@ module EM::FTPD::Memory
     end
     
     def rename(from, to, user = nil)
-      return false if exist?(to)
-      return false unless exist?(from)
+      titem = get_item(to)
+      return false if titem
+      fitem = get_item(from)
+      return false unless fitem
       return false unless use_allowed?(from, :delete, user)
       return false unless use_allowed?(to, :create, user)
       
@@ -133,86 +176,52 @@ module EM::FTPD::Memory
       to_dirname = File.dirname(to)
       to_basename = File.basename(to)
       
-      if from_dirname == to_dirname
-        @root[from_dirname].find {|file| file.name == from_basename}.name = to_basename
-      else
-        entry = @root[from_dirname].find {|file| file.name == from_basename}
-        @root[from_dirname] -= [entry]
-        entry.name = to_basename
-        @root[to_dirname] << entry
-      end
+      dir1 = get_item(from_dirname)
+      dir2 = get_item(to_dirname)
+      fitem.name = to_basename
+      dir2.contents[to_basename] = fitem
+      dir1.contents.delete(from_basename)
       
-      if is_dir(from)
-        @root[to] = @root[from]
-        @root.delete(from)
-      else
-        # @contents[to] points to the same reference/pointer as @contents[from]
-        # i.e., this is not a copy, they point to the same object
-        @contents[to] = @contents[from]
-        @contents.delete(from)
-      end
       return true
     end
     
     def destroy
-      @root.each_key do |d|
-        @root.delete(d)
-      end
-      @contents.each_key do |f|
-        @contents.delete(f)
-      end
+      @root = MemoryDirectoryItem.new(:name => '/', :owner => 'root', :directory => true, :permissions => "rwxr.xr.x", :contents => Hash.new)
       GC.start
     end
     
     def set_permissions(path, permissions, user = nil)
-      return false unless exist?(path)
+      item = get_item(path)
+      return false unless item
       raise InvalidPermissionsError.new if permissions.nil?
       raise InvalidPermissionsError.new(permissions.to_s) unless permissions.class == String
       raise InvalidPermissionsError.new(permissions) unless permissions =~ /^[r\.][w\.][x\.][r\.][w\.][x\.][r\.][w\.][x\.]$/
       if use_allowed?(path, :chmod, user)
-        entry = get_entry(path)
-        entry.permissions = permissions
+        item.permissions = permissions
         return true
       end
       false
     end
     
     def set_owner(path, owner, user = nil)
-      return false unless exist?(path) and owner and owner.class == String
-      entry = get_entry(path)
+      item = get_item(path)
+      return false unless item and owner and owner.class == String
       return false unless user and user == "root"
-      return false unless entry
-      entry.owner = owner
+      item.owner = owner
       true
     end
 
-    #private 
+    #private
     
-    def get_entry(path)
-      return @root_entry if path == '/'
-      dirname = File.dirname(path)
-      basename = File.basename(path)
-      if is_dir(dirname)
-        return @root[dirname].find {|entry| entry.name == basename}
+    def get_item(path)
+      cur = @root
+      path.split(/\//).each do |part|
+        next if part == ""
+        raise ArgumentError.new("Use of . and .. are forbidden") if part == "." or part == ".."
+        cur = cur.contents[part]
+        return nil if cur.nil?
       end
-      nil
-    end
-    
-    def get_file(path)
-      dirname = File.dirname(path)
-      basename = File.basename(path)
-      if is_dir(dirname)
-        return @root[dirname].find {|file| file.directory == false && file.name == basename}
-      end
-      nil
-    end
-    
-    def is_file(path)
-      @contents[path] || false
-    end
-    
-    def is_dir(path)
-      @root[path] != nil
+      cur
     end
     
     def use_allowed?(path, use, username)
@@ -241,8 +250,8 @@ module EM::FTPD::Memory
       when :time
         return true # since we've already checked everything
       when :chmod
-        entry = get_entry(path)
-        return entry.owner == username
+        item = get_item(path)
+        return item.owner == username
       when :delete
         return allowed?(dirname, "rwx", username)
       when :create
@@ -253,12 +262,12 @@ module EM::FTPD::Memory
     end
     
     def allowed?(path, required_permissions, username)
-      entry = get_entry(path)
-      permissions = entry.permissions || 'rwxrwxrwx'
-      return false unless entry
+      item = get_item(path)
+      return false unless item
+      permissions = item.permissions || 'rwxrwxrwx'
       if username.nil?
         perms = permissions[6,3]
-      elsif entry.owner == username
+      elsif item.owner == username
         perms = permissions[0,3]
       else
         perms = permissions[6,3]

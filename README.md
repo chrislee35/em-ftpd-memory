@@ -28,11 +28,23 @@ Or install it yourself as:
       "pwalgo" => "otp",
       
     }
-    auth = EM::FTPD::Memory::Authenticator.getAuthenticatorByRealm(options["authentication_realm"], options)
-    auth << EM::FTPD::Memory::User.new("test", "test1\ntest2\ntest3\ntest4\ntest5")
-    fs = EM::FTPD::Memory::FileSystem.getFileSystemByName(options["filesystem_name"])
-    fs.create_dir("/pub")
-    fs.create_file("/pub/helper.rb", "test/helper.rb")
+    auth = Authenticator.getAuthenticatorByRealm(options["authentication_realm"], options)
+    auth << User.new("test", "test1\ntest2\ntest3\ntest4\ntest5")
+    fs = FileSystem.getFileSystem(options["filesystem_name"])
+    fs.create_dir("/pub", 'root')
+    fs.create_file("/pub/helper.rb", "test/helper.rb", 'root')
+    fs.set_permissions("/pub", 'rwxr.xr.x', "root")
+    fs.create_dir("/uploads", 'root')
+    fs.set_permissions("/uploads", "rwxrwxrwx", "root")
+    
+    fs.create_dir("/users", 'root')
+    fs.set_permissions("/users", "rwxr.xr.x", "root")
+    ["hiro", "miyako", "pilar"].each do |username|
+      fs.create_dir("/users/#{username}", 'root')
+      fs.set_permissions("/users/#{username}", "rwx......", "root")
+      fs.set_owner("/users/#{username}", username, 'root')
+      auth << User.new(username, username)
+    end
     
     EM.run {
       EventMachine::start_server("0.0.0.0", 2021, EM::FTPD::Server, EM::FTPD::Memory::Driver, options)
