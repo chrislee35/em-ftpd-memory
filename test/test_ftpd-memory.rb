@@ -14,18 +14,12 @@ include EM::FTPD::Memory
 
 class TestFTPDMemory < Minitest::Test
   def test_example
-    options = {
-      "filesystem_name" => "boss",
-      "authentication_realm" => "georgia",
-      "pwalgo" => "otp",
-      
-    }
     # set up the authentication
-    auth = Authenticator.getAuthenticatorByRealm(options["authentication_realm"], options)
+    auth = Authenticator.getAuthenticatorByRealm("georgia")
     # add a test user
-    auth << User.new("test", "test1\ntest2\ntest3\ntest4\ntest5")
+    auth << User.new("test", "otp", "test1\ntest2\ntest3\ntest4\ntest5")
     # create the filesystem
-    fs = FileSystem.getFileSystem(options["filesystem_name"])
+    fs = FileSystem.getFileSystem("boss")
     # add a pub folder
     fs.create_dir("/pub", 'root')
     # add a file to the pub folder as root
@@ -47,9 +41,13 @@ class TestFTPDMemory < Minitest::Test
       fs.set_permissions("/users/#{username}", "rwx......", "root")
       # set the owner to the user
       fs.set_owner("/users/#{username}", username, 'root')
-      auth << User.new(username, username)
+      auth << User.new(username, "plain", username)
     end
     
+    options = {
+      "filesystem_name" => "boss",
+      "authentication_realm" => "georgia"
+    }
     EM.run {
       EventMachine::start_server("0.0.0.0", 2021, EM::FTPD::Server, EM::FTPD::Memory::Driver, options)
       EM::Timer.new(0.1) do

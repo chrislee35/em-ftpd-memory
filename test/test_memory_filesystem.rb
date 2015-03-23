@@ -190,6 +190,14 @@ class TestMemoryFilesystem < Minitest::Test
     refute(fs.set_permissions("/pub/pub2/pub3", "rwx......", "jem"))
     assert(fs.set_permissions("/pub/pub2", "rwxr.xr.x", "root"))
     assert(fs.set_permissions("/pub/pub2/pub3", "rwx......", "jem"))
+    
+    assert(fs.create_dir("/group_test", "root"))
+    assert(fs.set_group("/group_test", "test", "root", ["test"]))
+    assert(fs.set_permissions("/group_test", "rwxr.x...", "root"))
+    assert(fs.create_file("/group_test/test", "test/helper.rb", "root"))
+    assert_equal(0, fs.list_files("/group_test", "jem", ["nottest"]).length)
+    assert_equal(1, fs.list_files("/group_test", "jem", ["test", "other", "punkbands"]).length)
+    
   end
 
 end

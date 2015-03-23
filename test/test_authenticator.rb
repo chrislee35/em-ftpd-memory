@@ -12,22 +12,15 @@ include EM::FTPD::Memory
 
 class TestAuthenticator < Minitest::Test
   def test_invalid_pwalgo
-    options = {
-      "pwalgo" => "nogood",
-      "authentication_realm" => "invalid"
-    }
     assert_raises(InvalidPasswordAlgorithmError) do
-      Authenticator.getAuthenticatorByRealm(options["authentication_realm"], options)
+      auth = Authenticator.getAuthenticatorByRealm(__method__)
+      auth << User.new("test", "nogood", "test")
     end
   end
     
   def test_plain_login
-    options = {
-      "pwalgo" => "plain",
-      "authentication_realm" => "plain"
-    }
-    auth = Authenticator.getAuthenticatorByRealm(options["authentication_realm"], options)
-    auth << User.new("test", "test")
+    auth = Authenticator.getAuthenticatorByRealm(__method__)
+    auth << User.new("test", "plain", "test")
     assert_raises(NoSuchUserError) do
       auth.authenticate("jerk", "noway")
     end
@@ -40,12 +33,8 @@ class TestAuthenticator < Minitest::Test
   end
   
   def test_time_based_login
-    options = {
-      "pwalgo" => "timed_md5",
-      "authentication_realm" => "time_based"
-    }
-    auth = Authenticator.getAuthenticatorByRealm(options["authentication_realm"], options)
-    auth << User.new("test", "test")
+    auth = Authenticator.getAuthenticatorByRealm(__method__)
+    auth << User.new("test", "timed_md5", "test")
     assert_raises(NoSuchUserError) do
       auth.authenticate("jerk", "noway")
     end
@@ -85,12 +74,8 @@ class TestAuthenticator < Minitest::Test
   end
   
   def test_otp_login
-    options = {
-      "pwalgo" => "otp",
-      "authentication_realm" => "otp"
-    }
-    auth = Authenticator.getAuthenticatorByRealm(options["authentication_realm"], options)
-    auth << User.new("test", "test1\ntest2\ntest3\ntest4\ntest5")
+    auth = Authenticator.getAuthenticatorByRealm(__method__)
+    auth << User.new("test", "otp", "test1\ntest2\ntest3\ntest4\ntest5")
     assert_raises(NoSuchUserError) do
       auth.authenticate("jerk", "noway")
     end

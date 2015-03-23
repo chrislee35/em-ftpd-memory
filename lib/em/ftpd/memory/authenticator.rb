@@ -2,7 +2,7 @@ require 'em-ftpd'
 require 'digest/md5'
 
 module EM::FTPD::Memory
-  class User < Struct.new(:name, :credential); end
+  class User < Struct.new(:name, :algo, :credential); end
   class InvalidPasswordAlgorithmError < StandardError; end
   class NoSuchUserError < StandardError; end
   class InvalidCredentialError < StandardError; end
@@ -12,24 +12,23 @@ module EM::FTPD::Memory
 
   class Authenticator
     @@realms = Hash.new
-    def self.getAuthenticatorByRealm(realm, options = {})
+    def self.getAuthenticatorByRealm(realm)
       if @@realms[realm].nil?
-        @@realms[realm] = Authenticator.new(options)
+        @@realms[realm] = Authenticator.new
       end
       #puts "returning Authenticator of realm #{realm}"
       @@realms[realm]
     end
   
-    def initialize(options = {})
+    def initialize
       @users = Hash.new
-      @pwalgo = options["pwalgo"] || "plain"
-      @pwalgo = "#{@pwalgo}_authentication".to_sym
-      unless self.respond_to?(@pwalgo)
-        raise InvalidPasswordAlgorithmError.new
-      end
     end
   
     def <<(user)
+      unless self.respond_to?("#{user.algo}_authentication".to_sym)
+        raise InvalidPasswordAlgorithmError.new
+      end
+      user.algo = "#{user.algo}_authentication".to_sym
       @users[user.name] = user
     end
   
@@ -41,7 +40,7 @@ module EM::FTPD::Memory
       if @users[username].nil?
         raise NoSuchUserError.new
       end
-      self.send(@pwalgo, username, credential)
+      self.send(@users[username].algo, username, credential)
     end
   
     def plain_authentication(username, credential)
