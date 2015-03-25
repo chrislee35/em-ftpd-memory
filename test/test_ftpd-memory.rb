@@ -17,7 +17,9 @@ class TestFTPDMemory < Minitest::Test
     # set up the authentication
     auth = Authenticator.getAuthenticatorByRealm("georgia")
     # add a test user
-    auth << User.new("test", "otp", "test1\ntest2\ntest3\ntest4\ntest5")
+    auth << User.new(:name => "test", :algo => "otp", :credential => "test1\ntest2\ntest3\ntest4\ntest5")
+    # add an anonymous user, note: algo defaults to none if there are no credentials are specified
+    auth << User.new(:name => "anonymous")
     # create the filesystem
     fs = FileSystem.getFileSystem("boss")
     # add a pub folder
@@ -41,8 +43,17 @@ class TestFTPDMemory < Minitest::Test
       fs.set_permissions("/users/#{username}", "rwx......", "root")
       # set the owner to the user
       fs.set_owner("/users/#{username}", username, 'root')
-      auth << User.new(username, "plain", username)
+      auth << User.new(:name => username, :algo => "plain", :credential => username, :groups => ["testing"])
     end
+    
+    # since hiro, miyako, and pilar are all in the "testing" group, I can
+    # create a shared folder for them, but the "test" user won't be able to access
+    fs.create_dir("/shared", 'root')
+    fs.set_permissions("/shared", 'rwxr.xr.x', 'root')
+    fs.create_dir("/shared/testing", 'root')
+    # this isn't working
+    fs.set_group("/shared/testing", 'testing', 'root')
+    fs.set_permissions("/shared/testing", 'rwxrwx...', 'root')
     
     options = {
       "filesystem_name" => "boss",
@@ -50,7 +61,7 @@ class TestFTPDMemory < Minitest::Test
     }
     EM.run {
       EventMachine::start_server("0.0.0.0", 2021, EM::FTPD::Server, EM::FTPD::Memory::Driver, options)
-      EM::Timer.new(0.1) do
+      EM::Timer.new(100) do
         EM.stop
       end
     }

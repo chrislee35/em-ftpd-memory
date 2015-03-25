@@ -212,9 +212,9 @@ module EM::FTPD::Memory
     def set_group(path, group, user = nil, groups = [])
       item = get_item(path)
       return false unless item and group and group.class == String
-      return false unless user and user == "root"
-      return false unless groups.index(group)
+      return false unless (user and user == "root") or groups.index(group)
       item.group = group
+      true
     end
 
     #private
@@ -268,6 +268,7 @@ module EM::FTPD::Memory
     end
     
     def allowed?(path, required_permissions, username, groups)
+      #puts "allowed?(#{path}, #{required_permissions}, #{username}, #{groups.join(" ")})"
       item = get_item(path)
       return false unless item
       permissions = item.permissions || 'rwxrwxrwx'

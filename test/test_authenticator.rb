@@ -14,13 +14,13 @@ class TestAuthenticator < Minitest::Test
   def test_invalid_pwalgo
     assert_raises(InvalidPasswordAlgorithmError) do
       auth = Authenticator.getAuthenticatorByRealm(__method__)
-      auth << User.new("test", "nogood", "test")
+      auth << User.new(:name => "test", :algo => "nogood", :credential => "test")
     end
   end
     
   def test_plain_login
     auth = Authenticator.getAuthenticatorByRealm(__method__)
-    auth << User.new("test", "plain", "test")
+    auth << User.new(:name => "test", :algo => "plain", :credential => "test")
     assert_raises(NoSuchUserError) do
       auth.authenticate("jerk", "noway")
     end
@@ -34,7 +34,7 @@ class TestAuthenticator < Minitest::Test
   
   def test_time_based_login
     auth = Authenticator.getAuthenticatorByRealm(__method__)
-    auth << User.new("test", "timed_md5", "test")
+    auth << User.new(:name => "test", :algo => "timed_md5", :credential => "test")
     assert_raises(NoSuchUserError) do
       auth.authenticate("jerk", "noway")
     end
@@ -59,7 +59,7 @@ class TestAuthenticator < Minitest::Test
     time = Time.now.to_i
     seed = "this is a random seed"
     invalid_hash = Digest::MD5.hexdigest("#{seed}:#{time}:wrong")
-    invalid_cred = "#{seed}:#{time}:#{expired_hash}"
+    invalid_cred = "#{seed}:#{time}:#{invalid_hash}"
 
     assert_raises(InvalidCredentialError) do
       auth.authenticate("test", invalid_cred)
@@ -71,11 +71,16 @@ class TestAuthenticator < Minitest::Test
     valid_cred = "#{seed}:#{time}:#{valid_hash}"
     
     assert(auth.authenticate("test", valid_cred))
+    
+    assert_raises(ReplayCredentialError) do
+      auth.authenticate("test", valid_cred)
+    end
+    
   end
   
   def test_otp_login
     auth = Authenticator.getAuthenticatorByRealm(__method__)
-    auth << User.new("test", "otp", "test1\ntest2\ntest3\ntest4\ntest5")
+    auth << User.new(:name => "test", :algo => "otp", :credential => "test1\ntest2\ntest3\ntest4\ntest5")
     assert_raises(NoSuchUserError) do
       auth.authenticate("jerk", "noway")
     end
@@ -96,5 +101,15 @@ class TestAuthenticator < Minitest::Test
     assert_raises(NoFurtherCredentialsAvailable) do
       auth.authenticate("test", "test5")
     end
+  end
+  
+  def test_anonymous_login
+    auth = Authenticator.getAuthenticatorByRealm(__method__)
+    auth << User.new(:name => "anonymous")
+    assert_raises(NoSuchUserError) do
+      auth.authenticate("jerk", "noway")
+    end
+    
+    assert(auth.authenticate("anonymous","test@example.com"))
   end
 end
