@@ -33,7 +33,6 @@ module EM::FTPD::Memory
       if @@realms[realm].nil?
         @@realms[realm] = Authenticator.new
       end
-      #puts "returning Authenticator of realm #{realm}"
       @@realms[realm]
     end
   

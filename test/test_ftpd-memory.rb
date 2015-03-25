@@ -14,14 +14,18 @@ include EM::FTPD::Memory
 
 class TestFTPDMemory < Minitest::Test
   def test_example
+    options = {
+      "filesystem_name" => "boss",
+      "authentication_realm" => "georgia"
+    }
     # set up the authentication
-    auth = Authenticator.getAuthenticatorByRealm("georgia")
+    auth = Authenticator.getAuthenticatorByRealm(options["authentication_realm"])
     # add a test user
     auth << User.new(:name => "test", :algo => "otp", :credential => "test1\ntest2\ntest3\ntest4\ntest5")
     # add an anonymous user, note: algo defaults to none if there are no credentials are specified
     auth << User.new(:name => "anonymous")
     # create the filesystem
-    fs = FileSystem.getFileSystem("boss")
+    fs = FileSystem.getFileSystem(options["filesystem_name"])
     # add a pub folder
     fs.create_dir("/pub", 'root')
     # add a file to the pub folder as root
@@ -38,11 +42,13 @@ class TestFTPDMemory < Minitest::Test
     fs.set_permissions("/users", "rwxr.xr.x", "root")
     # create a personal directory for hiro, miyako, and pilar, (and add their test user)
     ["hiro", "miyako", "pilar"].each do |username|
+      # create a home directory
       fs.create_dir("/users/#{username}", 'root')
       # set the permissions so that no one else can access it
       fs.set_permissions("/users/#{username}", "rwx......", "root")
       # set the owner to the user
       fs.set_owner("/users/#{username}", username, 'root')
+      # add the user to the authentication realm
       auth << User.new(:name => username, :algo => "plain", :credential => username, :groups => ["testing"])
     end
     
@@ -51,17 +57,12 @@ class TestFTPDMemory < Minitest::Test
     fs.create_dir("/shared", 'root')
     fs.set_permissions("/shared", 'rwxr.xr.x', 'root')
     fs.create_dir("/shared/testing", 'root')
-    # this isn't working
     fs.set_group("/shared/testing", 'testing', 'root')
     fs.set_permissions("/shared/testing", 'rwxrwx...', 'root')
     
-    options = {
-      "filesystem_name" => "boss",
-      "authentication_realm" => "georgia"
-    }
     EM.run {
       EventMachine::start_server("0.0.0.0", 2021, EM::FTPD::Server, EM::FTPD::Memory::Driver, options)
-      EM::Timer.new(100) do
+      EM::Timer.new(0.1) do
         EM.stop
       end
     }

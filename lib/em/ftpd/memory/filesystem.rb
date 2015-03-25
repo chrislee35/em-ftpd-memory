@@ -23,7 +23,6 @@ module EM::FTPD::Memory
       if @@filesystems[name].nil?
         @@filesystems[name] = FileSystem.new
       end
-      #puts "returning FileSystem named #{name}"
       return @@filesystems[name]
     end
     
@@ -42,7 +41,14 @@ module EM::FTPD::Memory
 
 
     def initialize
-      @root = MemoryDirectoryItem.new(:name => '/', :owner => 'root', :group => 'root', :directory => true, :permissions => "rwxr.xr.x", :contents => Hash.new)
+      @root = MemoryDirectoryItem.new(
+        :name => '/', 
+        :owner => 'root', 
+        :group => 'root', 
+        :directory => true, 
+        :permissions => "rwxr.xr.x", 
+        :contents => Hash.new
+      )
     end
 
     def exist?(path)
@@ -113,7 +119,14 @@ module EM::FTPD::Memory
           item.contents = contents
           item.size = contents.length
         else # create new
-          dir.contents[basename] = MemoryDirectoryItem.new(:name => basename, :owner => user, :size => contents.length, :contents => contents, :permissions => permissions)
+          dir.contents[basename] = MemoryDirectoryItem.new(
+            :name => basename, 
+            :owner => user,
+            :group => groups.first || "nogroup",
+            :size => contents.length,
+            :contents => contents, 
+            :permissions => permissions
+          )
         end
         return true
       else
@@ -154,7 +167,13 @@ module EM::FTPD::Memory
         basename = File.basename(path)
         parent = get_item(dirname)
         if parent and parent.directory
-          parent.contents[basename] = MemoryDirectoryItem.new(:name => basename, :directory => true, :owner => user, :contents => Hash.new)
+          parent.contents[basename] = MemoryDirectoryItem.new(
+            :name => basename, 
+            :directory => true, 
+            :owner => user, 
+            :group => groups.first || "nogroup",
+            :contents => Hash.new
+          )
           return true
         end
       end
@@ -184,7 +203,14 @@ module EM::FTPD::Memory
     end
     
     def destroy
-      @root = MemoryDirectoryItem.new(:name => '/', :owner => 'root', :group => 'root', :directory => true, :permissions => "rwxr.xr.x", :contents => Hash.new)
+      @root = MemoryDirectoryItem.new(
+        :name => '/', 
+        :owner => 'root', 
+        :group => 'root', 
+        :directory => true, 
+        :permissions => "rwxr.xr.x", 
+        :contents => Hash.new
+      )
       GC.start
     end
     
@@ -268,7 +294,6 @@ module EM::FTPD::Memory
     end
     
     def allowed?(path, required_permissions, username, groups)
-      #puts "allowed?(#{path}, #{required_permissions}, #{username}, #{groups.join(" ")})"
       item = get_item(path)
       return false unless item
       permissions = item.permissions || 'rwxrwxrwx'
