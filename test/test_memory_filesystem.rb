@@ -11,6 +11,8 @@ require_relative 'helper'
 include EM::FTPD::Memory
 
 class TestMemoryFilesystem < Minitest::Test
+  @@file_size = File.size("test/helper.rb")
+  
   def test_filesystem_instance_retrieval
     fs = FileSystem.getFileSystem(__method__)
     fs2 = FileSystem.getFileSystem(__method__)
@@ -28,7 +30,7 @@ class TestMemoryFilesystem < Minitest::Test
     assert(fs.exist?("/helper.rb"))
     refute(fs.is_dir?("/helper.rb"))
     assert(fs.is_file?("/helper.rb"))
-    assert_equal(169, fs.file_size("/helper.rb"))
+    assert_equal(@@file_size, fs.file_size("/helper.rb"))
     FileSystem.destroyFileSystem(__method__)
   end
   
@@ -39,7 +41,7 @@ class TestMemoryFilesystem < Minitest::Test
     assert(fs.exist?("/helper.rb"))
     refute(fs.is_dir?("/helper.rb"))
     assert(fs.is_file?("/helper.rb"))
-    assert_equal(169, fs.file_size("/helper.rb"))
+    assert_equal(@@file_size, fs.file_size("/helper.rb"))
     assert(fs.delete_file("/helper.rb"))
     refute(fs.exist?("/helper.rb"))
     FileSystem.destroyFileSystem(__method__)
@@ -56,7 +58,7 @@ class TestMemoryFilesystem < Minitest::Test
     
     assert(fs.create_file("/pub/helper.rb", "test/helper.rb"))
     assert(fs.exist?("/pub/helper.rb"))
-    assert_equal(169, fs.file_size("/pub/helper.rb"))
+    assert_equal(@@file_size, fs.file_size("/pub/helper.rb"))
     assert(fs.delete_file("/pub/helper.rb"))
     refute(fs.exist?("/pub/helper.rb"))
     FileSystem.destroyFileSystem(__method__)
@@ -72,7 +74,7 @@ class TestMemoryFilesystem < Minitest::Test
     
     assert(fs.create_file("/pub/helper.rb", "test/helper.rb", "root"))
     assert(fs.exist?("/pub/helper.rb"))
-    assert_equal(169, fs.file_size("/pub/helper.rb", "root"))
+    assert_equal(@@file_size, fs.file_size("/pub/helper.rb", "root"))
     refute(fs.delete_dir("/pub", "root"))
     assert(fs.delete_file("/pub/helper.rb", "root"))
     refute(fs.exist?("/pub/helper.rb"))
@@ -91,11 +93,11 @@ class TestMemoryFilesystem < Minitest::Test
     
     assert(fs.create_file("/pub/helper.rb", "test/helper.rb"))
     assert(fs.exist?("/pub/helper.rb"))
-    assert_equal(169, fs.file_size("/pub/helper.rb"))
+    assert_equal(@@file_size, fs.file_size("/pub/helper.rb"))
     assert(fs.rename("/pub/helper.rb", "/pub/helper.txt"))
     refute(fs.exist?("/pub/helper.rb"))
     assert(fs.exist?("/pub/helper.txt"))
-    assert_equal(169, fs.file_size("/pub/helper.txt"))
+    assert_equal(@@file_size, fs.file_size("/pub/helper.txt"))
     
     FileSystem.destroyFileSystem(__method__)
   end
@@ -114,11 +116,11 @@ class TestMemoryFilesystem < Minitest::Test
     
     assert(fs.create_file("/pub/helper.rb", "test/helper.rb"))
     assert(fs.exist?("/pub/helper.rb"))
-    assert_equal(169, fs.file_size("/pub/helper.rb"))
+    assert_equal(@@file_size, fs.file_size("/pub/helper.rb"))
     assert(fs.rename("/pub/helper.rb", "/pub2/helper.txt"))
     refute(fs.exist?("/pub/helper.rb"))
     assert(fs.exist?("/pub2/helper.txt"))
-    assert_equal(169, fs.file_size("/pub2/helper.txt"))
+    assert_equal(@@file_size, fs.file_size("/pub2/helper.txt"))
     
     FileSystem.destroyFileSystem(__method__)
   end
@@ -138,7 +140,7 @@ class TestMemoryFilesystem < Minitest::Test
     assert(fs.exist?("/pub3"))
     refute(fs.is_dir?("/pub3"))
     assert(fs.is_file?("/pub3"))
-    assert_equal(169, fs.file_size("/pub3"))
+    assert_equal(@@file_size, fs.file_size("/pub3"))
     
     refute(fs.rename("/pub", "/pub2"))
     refute(fs.rename("/pub", "/pub3"))
@@ -176,14 +178,14 @@ class TestMemoryFilesystem < Minitest::Test
     refute(fs.create_file("/pub/pub2/pub3/pub4/helper.rb", "test/helper.rb"))
     assert(fs.create_file("/pub/pub2/pub3/pub4/helper.rb", "test/helper.rb", "root"))
     refute(fs.file_size("/pub/pub2/pub3/pub4/helper.rb"))
-    assert_equal(169, fs.file_size("/pub/pub2/pub3/pub4/helper.rb", "root"))
+    assert_equal(@@file_size, fs.file_size("/pub/pub2/pub3/pub4/helper.rb", "root"))
 
 
     assert_equal(0, fs.list_files("/pub/pub2/pub3", "jem").length)
     refute(fs.file_size("/pub/pub2/pub3/pub4/helper.rb", "jem"))
     assert(fs.set_owner("/pub/pub2/pub3", "jem", "root"))
     assert_equal(1, fs.list_files("/pub/pub2/pub3", "jem").length)
-    assert_equal(169, fs.file_size("/pub/pub2/pub3/pub4/helper.rb", "jem"))
+    assert_equal(@@file_size, fs.file_size("/pub/pub2/pub3/pub4/helper.rb", "jem"))
 
     assert(fs.set_permissions("/pub/pub2", "rwx......", "root"))
     # jem owns pub3, but should be denied since she can't traverse pub2
